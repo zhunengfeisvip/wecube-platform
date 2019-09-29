@@ -12,7 +12,7 @@ spring:
 #      url: jdbc:mysql://129.204.99.160:3306/wecube_dev?useUnicode=true&characterEncoding=UTF8&useJDBCTCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=Asia/Shanghai&useSSL=false
 #      username: wecube
 #      password: password
-      driver-class-name: com.mysql.cj.jdbc.Driver
+#      driver-class-name: com.mysql.cj.jdbc.Driver
    profiles:
       active: dev
    thymeleaf:
@@ -21,5 +21,5 @@ spring:
       database: mysql
       show-sql: true
       hibernate:
-         ddl-auto: none
+         ddl-auto: update
          use-new-id-generator-mappings: false
