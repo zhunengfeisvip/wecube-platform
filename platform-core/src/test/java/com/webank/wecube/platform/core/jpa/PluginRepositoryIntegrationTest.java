@@ -71,26 +71,6 @@ public class PluginRepositoryIntegrationTest extends DatabaseBasedTest {
     }
 
     @Test
-    public void findMaxPortByHost() {
-
-        PluginPackage pluginPackage = new PluginPackage(null, "test-findSavedInstanceByContainerId", "v1", UNREGISTERED,
-                newLinkedHashSet(), newLinkedHashSet(), newLinkedHashSet(), newLinkedHashSet(), newLinkedHashSet(),
-                newLinkedHashSet(), newLinkedHashSet(), newLinkedHashSet(), newLinkedHashSet(), newLinkedHashSet());
-        PluginConfig pluginConfig = new PluginConfig(null, pluginPackage, "VM", null, "VM",
-                PluginConfig.Status.DISABLED, null);
-
-        pluginPackage.setPluginConfigs(newLinkedHashSet(pluginConfig));
-        pluginPackageRepository.save(pluginPackage);
-
-        PluginInstance pluginInstance = new PluginInstance(null, pluginPackage, "test-instance-container-id",
-                "10.107.117.154", 29999, "running");
-        pluginInstanceRepository.save(pluginInstance);
-
-        Integer foundPluginInstancePort = pluginInstanceRepository.findMaxPortByHost("10.107.117.154");
-        assertThat(foundPluginInstancePort).isEqualTo(pluginInstance.getPort());
-    }
-
-    @Test
     public void findAllPluginPackageEntities() {
         PluginPackage package_1 = mockPluginPackage("package_1", "1.0");
         List<PluginPackageEntity> pluginPackageEntityList = mockPluginPackageEntityList(package_1);
