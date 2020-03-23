@@ -46,6 +46,8 @@ public class PluginConfigService {
     private PluginPackageEntityRepository pluginPackageEntityRepository;
     @Autowired
     private PluginPackageDataModelRepository dataModelRepository;
+    @Autowired
+    private RolePluginInterfaceRepository rolePluginInterfaceRepository;
 
     public List<PluginConfigInterface> getPluginConfigInterfaces(String pluginConfigId) {
         return pluginConfigRepository.findAllPluginConfigInterfacesByConfigIdAndFetchParameters(pluginConfigId);
@@ -355,5 +357,15 @@ public class PluginConfigService {
         } else {
             throw new WecubeCoreException(String.format("Can not found PluginConfig[%s]", configId));
         }
+    }
+
+    public void grantPluginInterfacePermissionToRoles(String pluginInterfaceId,List<String> roleList) {
+        
+        
+    }
+    
+    public void removePluginInterfacePermissionToRoles(String pluginInterfaceId,List<String> roleList) {
+        
+        
     }
 }
