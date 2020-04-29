@@ -97,7 +97,7 @@ create table plugin_package_runtime_resources_docker (
   plugin_package_id VARCHAR(255) not null,
   image_name varchar(256) not null, 
   container_name varchar(128) not null,
-  port_bindings varchar(64) not null, 
+  port_bindings varchar(256) not null, 
   volume_bindings varchar(1024) not null,
   env_variables varchar(2000)
 ) ENGINE=InnoDB  DEFAULT CHARSET=utf8 ;
@@ -187,7 +187,7 @@ create table plugin_package_resource_files
 
 drop table if exists resource_server;
 CREATE TABLE `resource_server` (
-    `id` VARCHAR(64) PRIMARY KEY,
+    `id` VARCHAR(255) PRIMARY KEY,
     `created_by` VARCHAR(255) NULL DEFAULT NULL ,
     `created_date` DATETIME NULL DEFAULT NULL,
     `host` VARCHAR(255) NULL DEFAULT NULL ,
@@ -205,7 +205,7 @@ CREATE TABLE `resource_server` (
 
 drop table if exists resource_item;
 CREATE TABLE `resource_item` (
-    `id` VARCHAR(64) PRIMARY KEY,
+    `id` VARCHAR(255) PRIMARY KEY,
     `additional_properties` VARCHAR(2048) NULL DEFAULT NULL,
     `created_by` VARCHAR(255) NULL DEFAULT NULL,
     `created_date` DATETIME NULL DEFAULT NULL,

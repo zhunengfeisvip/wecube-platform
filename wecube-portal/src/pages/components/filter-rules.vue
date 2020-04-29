@@ -23,7 +23,7 @@
         }}</Button>
       </div>
       <div slot="content">
-        <div class="filter_rules_path_options">
+        <div v-if="!disabled" class="filter_rules_path_options">
           <ul>
             <li id="paste" v-if="pathList.length === 0">
               <input
@@ -48,7 +48,7 @@
           </ul>
           <hr />
           <div style="max-height: 145px;overflow: auto;">
-            <ul v-for="opt in currentLeafOptiongs" :key="opt.pathExp + Math.random() * 1000">
+            <ul v-if="!needNativeAttr" v-for="opt in currentLeafOptiongs" :key="opt.pathExp + Math.random() * 1000">
               <li style="color:rgb(49, 104, 4)" @click="optClickHandler(opt)">{{ opt.pathExp }}</li>
             </ul>
             <ul v-for="opt in currentRefOptiongs" :key="opt.pathExp + Math.random() * 1000">
@@ -89,7 +89,7 @@
               e.key_name
             }}</Option>
           </Select>
-          <span v-if="rule.op === 'is' || rule.op === 'isnot'">null</span>
+          <span v-if="rule.op === 'is' || rule.op === 'isnot'">NULL</span>
         </Col>
       </Row>
       <Row style="margin-top: 10px">
@@ -120,10 +120,17 @@ export default {
     }
   },
   props: {
+    rootEntity: {
+      required: false
+    },
     value: {
       required: false
     },
     needAttr: {
+      type: Boolean,
+      default: false
+    },
+    needNativeAttr: {
       type: Boolean,
       default: false
     },
@@ -133,7 +140,6 @@ export default {
   watch: {
     value: {
       handler (val) {
-        console.log(val)
         // if (val === this.fullPathExp) return
         this.formatFirstCurrentOptions()
       }
@@ -141,6 +147,13 @@ export default {
     allDataModelsWithAttrs: {
       handler (val) {
         this.formatCurrentOptions()
+      }
+    },
+    rootEntity: {
+      handler (val) {
+        this.restorePathExp(val)
+        this.$emit('input', this.fullPathExp)
+        this.$emit('change', this.fullPathExp)
       }
     }
   },
@@ -199,6 +212,8 @@ export default {
       }
       let data = clipboardData.getData('Text')
       this.restorePathExp(data)
+      this.$emit('input', this.fullPathExp)
+      this.$emit('change', this.fullPathExp)
     },
     restorePathExp (PathExp) {
       this.pathList = []
@@ -252,7 +267,7 @@ export default {
       this.formatNextCurrentOptions(opt)
       this.currentNodeIndex++
       this.currentNode = opt
-      this.poptipVisable = this.needAttr
+      this.poptipVisable = this.needAttr || this.needNativeAttr
     },
     async attrChangeHandler (v, rule) {
       const found = this.currentNodeEntityAttrs.find(_ => _.name === v)
@@ -284,19 +299,21 @@ export default {
     okHandler () {
       this.modelVisable = false
       let rules = ''
-      this.currentPathFilterRules.forEach((rule, index) => {
-        const isMultiple = Array.isArray(rule.value)
-        let str = ''
-        if (isMultiple) {
-          str = `{${rule.attr} ${rule.op} [${rule.value.map(v => `'${v}'`)}]}`
-        } else if (rule.op === 'is' || rule.op === 'isnot') {
-          str = `{${rule.attr} ${rule.op} null}`
-        } else {
-          const noQuotation = rule.op === 'gt' || rule.op === 'lt'
-          str = noQuotation ? `{${rule.attr} ${rule.op} ${rule.value}}` : `{${rule.attr} ${rule.op} '${rule.value}'}`
-        }
-        rules += str
-      })
+      this.currentPathFilterRules
+        .filter(r => r.op && r.attr)
+        .forEach((rule, index) => {
+          const isMultiple = Array.isArray(rule.value)
+          let str = ''
+          if (isMultiple) {
+            str = `{${rule.attr} ${rule.op} [${rule.value.map(v => `'${v}'`)}]}`
+          } else if (rule.op === 'is' || rule.op === 'isnot') {
+            str = `{${rule.attr} ${rule.op} NULL}`
+          } else {
+            const noQuotation = rule.op === 'gt' || rule.op === 'lt'
+            str = noQuotation ? `{${rule.attr} ${rule.op} ${rule.value}}` : `{${rule.attr} ${rule.op} '${rule.value}'}`
+          }
+          rules += str
+        })
       this.pathList[this.currentNodeIndex].pathExp = this.pathList[this.currentNodeIndex].pathExp.split('{')[0] + rules
       this.currentPathFilterRules = []
       this.$emit('input', this.fullPathExp)
@@ -336,7 +353,7 @@ export default {
             }
           }
           value =
-            value.indexOf('[') > -1
+            value.indexOf('[') > -1 && found.dataType === 'ref'
               ? value
                 .slice(1, -1)
                 .split(',')
@@ -387,7 +404,7 @@ export default {
         this.formatCurrentOptions()
         return
       }
-      if (opt.nodeType === 'leaf' || !this.needAttr) {
+      if (opt.nodeType === 'leaf' || !this.needAttr || opt.nodeType === 'attr') {
         this.currentOptiongs = []
         this.currentRefOptiongs = []
         this.currentLeafOptiongs = []
@@ -411,48 +428,69 @@ export default {
             }
           })
           this.currentLeafOptiongs = []
-          let referenceToEntityList = []
-          data.leafEntityList.referenceToEntityList.forEach(e => {
-            const index = referenceToEntityList.indexOf(e.filterRule)
-            if (index < 0) {
-              const found = data.referenceToEntityList.filter(
-                _ => `${_.packageName}:${_.name}` === `${e.packageName}:${e.entityName}`
-              )
-              found.forEach(j => {
-                this.currentLeafOptiongs.push({
-                  pkg: e.packageName,
-                  entity: e.name,
-                  pathExp: `.${j.relatedAttribute.name}>${e.filterRule}`,
-                  nodeType: 'entity'
-                })
+          if (this.needNativeAttr) {
+            const foundEntity = this.allEntity.find(i => i.packageName === opt.pkg && i.name === opt.entity)
+            const attrOption = foundEntity.attributes
+              .filter(attr => attr.dataType !== 'ref')
+              .map(a => {
+                return {
+                  pkg: a.packageName,
+                  entity: a.entityName,
+                  pathExp: `.${a.name}`,
+                  nodeType: 'attr'
+                }
               })
-              referenceToEntityList.push(e.filterRule)
-            }
-          })
-          let referenceByEntityList = []
-          data.leafEntityList.referenceByEntityList.forEach(e => {
-            const index = referenceByEntityList.indexOf(e.filterRule)
-            if (index < 0) {
-              const found = data.referenceByEntityList.filter(
-                _ => `${_.packageName}:${_.name}` === `${e.packageName}:${e.entityName}`
-              )
-              found.forEach(j => {
-                this.currentLeafOptiongs.push({
-                  pkg: e.packageName,
-                  entity: e.name,
-                  pathExp: `~(${j.relatedAttribute.name})${e.filterRule}`,
-                  nodeType: 'leaf'
+            this.currentOptiongs = this.currentOptiongs.concat(attrOption)
+          } else {
+            let referenceToEntityList = []
+            data.leafEntityList.referenceToEntityList.forEach(e => {
+              const index = referenceToEntityList.indexOf(e.filterRule)
+              if (index < 0) {
+                const found = data.referenceToEntityList.filter(
+                  _ => `${_.packageName}:${_.name}` === `${e.packageName}:${e.entityName}`
+                )
+                found.forEach(j => {
+                  this.currentLeafOptiongs.push({
+                    pkg: e.packageName,
+                    entity: e.name,
+                    pathExp: `.${j.relatedAttribute.name}>${e.filterRule}`,
+                    nodeType: 'entity'
+                  })
                 })
-              })
-              referenceByEntityList.push(e.filterRule)
-            }
-          })
+                referenceToEntityList.push(e.filterRule)
+              }
+            })
+            let referenceByEntityList = []
+            data.leafEntityList.referenceByEntityList.forEach(e => {
+              const index = referenceByEntityList.indexOf(e.filterRule)
+              if (index < 0) {
+                const found = data.referenceByEntityList.filter(
+                  _ => `${_.packageName}:${_.name}` === `${e.packageName}:${e.entityName}`
+                )
+                found.forEach(j => {
+                  this.currentLeafOptiongs.push({
+                    pkg: e.packageName,
+                    entity: e.name,
+                    pathExp: `~(${j.relatedAttribute.name})${e.filterRule}`,
+                    nodeType: 'leaf'
+                  })
+                })
+                referenceByEntityList.push(e.filterRule)
+              }
+            })
+          }
         }
       }
     }
   },
   mounted () {
     // this.bindPastePathExp()
+    if (!this.value && this.rootEntity) {
+      this.restorePathExp(this.rootEntity)
+      this.$emit('input', this.fullPathExp)
+      this.$emit('change', this.fullPathExp)
+      return
+    }
     this.formatFirstCurrentOptions()
   }
 }

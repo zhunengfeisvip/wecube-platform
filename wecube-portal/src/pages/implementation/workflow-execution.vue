@@ -5,23 +5,34 @@
         <Col span="20">
           <Form v-if="isEnqueryPage" label-position="left">
             <FormItem :label-width="150" :label="$t('orchs')">
-              <Select v-model="selectedFlowInstance" style="width:70%" filterable clearable>
+              <Select v-model="selectedFlowInstance" style="width:70%" filterable>
                 <Option
                   v-for="item in allFlowInstances"
                   :value="item.id"
                   :key="item.id"
                   :label="
-                    item.procInstName + ' ' + (item.createdTime || 'createdTime') + ' ' + (item.operator || 'operator')
+                    item.procInstName +
+                      ' ' +
+                      item.entityDisplayName +
+                      ' ' +
+                      (item.createdTime || 'createdTime') +
+                      ' ' +
+                      (item.operator || 'operator')
                   "
                 >
                   <span>
-                    {{
-                      item.procInstName +
-                        ' ' +
-                        (item.createdTime || 'createdTime') +
-                        ' ' +
-                        (item.operator || 'operator')
-                    }}
+                    <span style="color:#2b85e4">
+                      {{ item.procInstName + ' ' }}
+                    </span>
+                    <span style="color:#515a6e">
+                      {{ item.entityDisplayName + ' ' }}
+                    </span>
+                    <span style="color:#ccc;float:right">
+                      {{ (item.createdTime || 'createdTime') + ' ' }}
+                    </span>
+                    <span style="float:right;color:#515a6e;margin-right:20px">
+                      {{ item.operator || 'operator' }}
+                    </span>
                   </span>
                 </Option>
               </Select>
@@ -53,7 +64,6 @@
                     @on-change="orchestrationSelectHandler"
                     @on-open-change="getAllFlow"
                     filterable
-                    clearable
                   >
                     <Option v-for="item in allFlows" :value="item.procDefId" :key="item.procDefId">{{
                       item.procDefName + ' ' + item.createdTime
@@ -77,7 +87,6 @@
                     @on-change="onTargetSelectHandler"
                     @on-open-change="getTargetOptions"
                     filterable
-                    clearable
                   >
                     <Option v-for="item in allTarget" :value="item.id" :key="item.id">{{ item.key_name }}</Option>
                   </Select>
@@ -158,7 +167,7 @@
       </p>
       <div v-if="!isTargetNodeDetail" :style="[{ overflow: 'auto' }, fullscreenModalContentStyle]">
         <h5>Data:</h5>
-        <div style="margin: 0 6px 6px" v-html="nodeDetailResponseHeader"></div>
+        <pre style="margin: 0 6px 6px" v-html="nodeDetailResponseHeader"></pre>
         <h5>requestObjects:</h5>
         <Table :columns="nodeDetailColumns" :max-height="tableMaxHeight" tooltip="true" :data="nodeDetailIO"></Table>
       </div>
@@ -448,6 +457,7 @@ export default {
       }
     },
     async getTargetOptions () {
+      if (!(this.selectedFlow && this.selectedFlow.length > 0)) return
       const { status, data } = await getTargetModelByProcessDefId(this.selectedFlow)
       if (status === 'OK') {
         this.allTarget = data
@@ -512,13 +522,17 @@ export default {
       this.getModelData()
     },
     async getModelData () {
-      if (!this.selectedFlow || !this.selectedTarget) return
+      this.modelData = []
+      if ((!this.selectedFlow || !this.selectedTarget) && !this.isEnqueryPage) {
+        this.renderModelGraph()
+        return
+      }
       this.isLoading = true
       let { status, data } = this.isEnqueryPage
         ? await getPreviewEntitiesByInstancesId(this.selectedFlowInstance)
         : await getTreePreviewData(this.selectedFlow, this.selectedTarget)
       this.isLoading = false
-      if (!this.selectedTarget) return
+      if (!this.selectedTarget && !this.isEnqueryPage) return
       if (status === 'OK') {
         this.processSessionId = data.processSessionId
         const binds = await getAllBindingsProcessSessionId(data.processSessionId)
@@ -530,8 +544,8 @@ export default {
           }
         })
         this.formatRefNodeIds()
-        this.renderModelGraph()
       }
+      this.renderModelGraph()
     },
     async getFlowOutlineData (id) {
       if (!id) return
@@ -556,13 +570,15 @@ export default {
       let nodes = this.modelData.map((_, index) => {
         const nodeId = _.packageName + '_' + _.entityName + '_' + _.dataId
         let color = _.isHighlight ? '#5DB400' : 'black'
-        const isRecord = _.refFlowNodeIds.length > 0
-        const shape = isRecord ? 'ellipse' : 'ellipse'
+        // const isRecord = _.refFlowNodeIds.length > 0
+        // const shape = isRecord ? 'ellipse' : 'ellipse'
+        const str = _.displayName || _.dataId
         const refStr = _.refFlowNodeIds.toString().replace(/,/g, '/')
-        const len = refStr.length - _.displayName.length > 0 ? refStr.length : _.displayName.length
-        const fontSize = Math.abs(50 - len) * 0.25
-        const label = (_.displayName || _.dataId) + '\n' + refStr
-        return `${nodeId} [label="${label}" class="model" id="${nodeId}" color="${color}" style="filled" fontsize=${fontSize} fillcolor="white" shape="${shape}"]`
+        // const len = refStr.length - _.displayName.length > 0 ? refStr.length : _.displayName.length
+        const firstLabel = str.length > 15 ? `${str.slice(0, 1)}...${str.slice(-14)}` : str
+        // const fontSize = Math.min((58 / len) * 3, 16)
+        const label = firstLabel + '\n' + refStr
+        return `${nodeId} [label="${label}" class="model" id="${nodeId}" color="${color}" style="filled" fillcolor="white" shape="box"]`
       })
       let genEdge = () => {
         let pathAry = []
@@ -586,16 +602,27 @@ export default {
       let nodesString =
         'digraph G { ' +
         'bgcolor="transparent";' +
-        'Node [fontname=Arial, shape="ellipse", fixedsize="true", width="1.6", height=".8"];' +
+        'Node [fontname=Arial, shape="ellipse"];' +
         'Edge [fontname=Arial, minlen="1", color="#7f8fa6", fontsize=10];' +
         nodesToString +
         genEdge() +
         '}'
-      this.graph.graphviz.renderDot(nodesString)
+      this.graph.graphviz.transition().renderDot(nodesString)
+      // .on('end', this.setFontSizeForText)
       removeEvent('.model text', 'mouseenter', this.modelGraphMouseenterHandler)
       removeEvent('.model text', 'mouseleave', this.modelGraphMouseleaveHandler)
       addEvent('.model text', 'mouseenter', this.modelGraphMouseenterHandler)
       addEvent('.model text', 'mouseleave', this.modelGraphMouseleaveHandler)
+    },
+    setFontSizeForText () {
+      const nondes = d3.selectAll('#graph svg g .node')._groups[0]
+      for (let i = 0; i < nondes.length; i++) {
+        const len = nondes[i].children[2].innerHTML.replace(/&nbsp;/g, '').length
+        const fontsize = Math.min((nondes[i].children[1].rx.baseVal.value / len) * 3, 16)
+        for (let j = 2; j < nondes[i].children.length; j++) {
+          nondes[i].children[j].setAttribute('font-size', fontsize)
+        }
+      }
     },
     modelGraphMouseenterHandler (e) {
       clearTimeout(this.modelDetailTimer)
@@ -684,7 +711,7 @@ export default {
         genEdge() +
         '}'
 
-      this.flowGraph.graphviz.renderDot(nodesString)
+      this.flowGraph.graphviz.transition().renderDot(nodesString)
       this.bindFlowEvent()
     },
     async excutionFlow () {
@@ -708,8 +735,9 @@ export default {
         })
 
         let payload = {
-          processSessionId: this.processSessionId,
           entityDataId: currentTarget.id,
+          processSessionId: this.processSessionId,
+          entityDisplayName: currentTarget.displayName,
           entityTypeId: this.flowData.rootEntity,
           procDefId: this.flowData.procDefId,
           taskNodeBinds: taskNodeBinds.map(_ => {
@@ -820,20 +848,32 @@ export default {
         this.nodeTitle = (found.orderedNo ? found.orderedNo + '、' : '') + found.nodeName
         const { status, data } = await getNodeContext(found.procInstId, found.id)
         if (status === 'OK') {
-          this.nodeDetail = data
           this.nodeDetailResponseHeader = JSON.parse(JSON.stringify(data))
           delete this.nodeDetailResponseHeader.requestObjects
-          this.nodeDetailResponseHeader = JSON.stringify(this.nodeDetailResponseHeader)
+          this.nodeDetailResponseHeader = JSON.stringify(this.replaceParams(this.nodeDetailResponseHeader))
             .split(',')
             .join(',<br/>')
-          this.nodeDetailIO = data.requestObjects
+          this.nodeDetailIO = data.requestObjects.map(ro => {
+            ro['inputs'] = this.replaceParams(ro['inputs'])
+            ro['outputs'] = this.replaceParams(ro['outputs'])
+            return ro
+          })
         }
         this.nodeDetailFullscreen = false
         this.isTargetNodeDetail = false
         this.showNodeDetail = true
-        this.nodeDetailFullscreen = false
         this.tableMaxHeight = 250
       }, 1000)
+    },
+    replaceParams (obj) {
+      let placeholder = new Array(16).fill('&nbsp;')
+      placeholder.unshift('<br/>')
+      for (let key in obj) {
+        if (obj[key] !== null && typeof obj[key] === 'string') {
+          obj[key] = obj[key].replace('\r\n', placeholder.join(''))
+        }
+      }
+      return obj
     },
     flowDetailEnterHandler (e) {
       let modelDetail = document.getElementById('flow_graph_detail')
@@ -918,7 +958,7 @@ export default {
         this.flowGraph.graphviz = graph
           .graphviz()
           .fit(true)
-          .zoom(false)
+          .zoom(true)
           .height(graphEl.offsetHeight - 10)
           .width(graphEl.offsetWidth - 10)
       }
@@ -934,7 +974,7 @@ export default {
 </script>
 <style lang="scss" scoped>
 body {
-  color: #15a043;
+  color: #e5f173; //#15a043;
 }
 #graphcontain {
   border: 1px solid #d3cece;

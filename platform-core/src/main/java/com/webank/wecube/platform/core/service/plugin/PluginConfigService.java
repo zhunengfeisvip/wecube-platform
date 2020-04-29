@@ -69,6 +69,7 @@ public class PluginConfigService {
         String packageId = pluginConfigDto.getPluginPackageId();
         PluginPackage pluginPackage = pluginPackageRepository.findById(packageId).get();
 
+        ensurePluginConfigRegisterNameNotExisted(pluginConfigDto);
         PluginConfig pluginConfig = pluginConfigDto.toDomain(pluginPackage);
         ensurePluginConfigIdNotExisted(pluginConfig);
 
@@ -82,6 +83,33 @@ public class PluginConfigService {
         pluginConfig.initId();
         if (pluginConfigRepository.existsById(pluginConfig.getId())) {
             throw new WecubeCoreException(String.format("PluginConfig[%s] already exist", pluginConfig.getId()));
+        }
+    }
+
+    private void ensurePluginConfigRegisterNameNotExisted(PluginConfigDto pluginConfigDto) {
+        if (pluginConfigRepository.existsByPluginPackage_idAndNameAndRegisterName(pluginConfigDto.getPluginPackageId(),
+                pluginConfigDto.getName(), pluginConfigDto.getRegisterName())) {
+            throw new WecubeCoreException(
+                    String.format("PluginPackage[%s] already have this PluginConfig[%s] with RegisterName[%s]",
+                            pluginConfigDto.getPluginPackageId(), pluginConfigDto.getName(),
+                            pluginConfigDto.getRegisterName()));
+        }
+    }
+
+    private void ensurePluginConfigUnique(PluginConfigDto pluginConfigDto) {
+        Optional<List<PluginConfig>> existedPluginConfigListOptional = pluginConfigRepository
+                .findAllByPluginPackage_idAndNameAndRegisterName(pluginConfigDto.getPluginPackageId(),
+                        pluginConfigDto.getName(), pluginConfigDto.getRegisterName());
+        if (existedPluginConfigListOptional.isPresent()) {
+            List<PluginConfig> existedPluginConfigList = existedPluginConfigListOptional.get();
+            existedPluginConfigList.forEach(existedPluginConfig -> {
+                if (!existedPluginConfig.getId().equals(pluginConfigDto.getId())) {
+                    throw new WecubeCoreException(
+                            String.format("PluginPackage[%s] already have this PluginConfig[%s] with RegisterName[%s]",
+                                    pluginConfigDto.getPluginPackageId(), pluginConfigDto.getName(),
+                                    pluginConfigDto.getRegisterName()));
+                }
+            });
         }
     }
 
@@ -101,21 +129,22 @@ public class PluginConfigService {
         return PluginConfigDto.fromDomain(savedPluginConfig);
     }
 
-    private void ensurePluginConfigIsValid(PluginConfigDto pluginConfig) {
-        if (StringUtils.isBlank(pluginConfig.getPluginPackageId())
-                || !pluginPackageRepository.existsById(pluginConfig.getPluginPackageId())) {
+    private void ensurePluginConfigIsValid(PluginConfigDto pluginConfigDto) {
+        if (StringUtils.isBlank(pluginConfigDto.getPluginPackageId())
+                || !pluginPackageRepository.existsById(pluginConfigDto.getPluginPackageId())) {
             throw new WecubeCoreException(String.format("Cannot find PluginPackage with id=%s in PluginConfig",
-                    pluginConfig.getPluginPackageId()));
+                    pluginConfigDto.getPluginPackageId()));
         }
-        if (StringUtils.isBlank(pluginConfig.getId())) {
-            throw new WecubeCoreException("Invalid pluginConfig with id: " + pluginConfig.getId());
-        }
-
-        if (!pluginConfigRepository.existsById(pluginConfig.getId())) {
-            throw new WecubeCoreException("PluginConfig not found for id: " + pluginConfig.getId());
+        if (StringUtils.isBlank(pluginConfigDto.getId())) {
+            throw new WecubeCoreException("Invalid pluginConfig with id: " + pluginConfigDto.getId());
         }
 
-        ensureEntityIsValid(pluginConfig.getName(), pluginConfig.getTargetPackage(), pluginConfig.getTargetEntity());
+        if (!pluginConfigRepository.existsById(pluginConfigDto.getId())) {
+            throw new WecubeCoreException("PluginConfig not found for id: " + pluginConfigDto.getId());
+        }
+        ensurePluginConfigUnique(pluginConfigDto);
+
+        ensureEntityIsValid(pluginConfigDto.getName(), pluginConfigDto.getTargetPackage(), pluginConfigDto.getTargetEntity());
     }
 
     private void ensureEntityIsValid(String pluginConfigName, String targetPackage, String targetEntity) {

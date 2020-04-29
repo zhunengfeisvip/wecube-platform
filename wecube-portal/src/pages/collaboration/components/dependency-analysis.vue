@@ -82,10 +82,11 @@ export default {
         return `"${from.id}" -> "${to.id}"[edgetooltip="${to.id}"];`
       }
       let addNodeAttr = node => {
+        const label = node.id + '_' + node.version
+        const len = label.length
+        const fontSize = Math.min((58 / len) * 3, 16)
         const color = node.status === 'active' ? '#19be6b' : '#c5c8ce'
-        return `"${node.id}" [id="${node.id}" label="${node.id +
-          '_' +
-          node.version}" shape="ellipse" color="${color}" style="filled"];`
+        return `"${node.id}" [id="${node.id}" label="${label}" fontsize=${fontSize} shape="ellipse" color="${color}" style="filled"];`
       }
       const nodeMap = new Map()
       this.data.forEach(node => {
@@ -122,7 +123,18 @@ export default {
     },
     renderGraph () {
       let nodesString = this.genDOT()
-      this.graph.graphviz.renderDot(nodesString)
+      this.graph.graphviz.renderDot(nodesString).on('end', this.setFontSizeForText)
+    },
+    setFontSizeForText () {
+      const nondes = d3.selectAll('#dependency-analysis-graph svg g .node')._groups[0]
+      for (let i = 0; i < nondes.length; i++) {
+        const len = nondes[i].children[2].innerHTML.replace(/&nbsp;/g, '').length
+        const fontsize = Math.min((nondes[i].children[1].rx.baseVal.value / len) * 3, 16)
+        for (let j = 2; j < nondes[i].children.length; j++) {
+          console.log(fontsize)
+          nondes[i].children[j].setAttribute('font-size', fontsize)
+        }
+      }
     },
     initGraph () {
       const initEvent = () => {

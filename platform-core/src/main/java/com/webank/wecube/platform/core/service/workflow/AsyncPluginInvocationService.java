@@ -136,7 +136,8 @@ public class AsyncPluginInvocationService extends AbstractPluginInvocationServic
             log.error("result data handling failed", e);
             result.setResultCode(RESULT_CODE_ERR);
             pluginInvocationResultService.responsePluginInterfaceInvocation(result);
-            handlePluginInterfaceInvocationFailure(ctx, "101", "result data handling failed:" + e.getMessage());
+            String errMsg = e.getMessage() == null ? "error" : trimWithMaxLength(e.getMessage());
+            handlePluginInterfaceInvocationFailure(ctx, "101", "result data handling failed:" + errMsg);
         }
 
         return;
@@ -280,6 +281,7 @@ public class AsyncPluginInvocationService extends AbstractPluginInvocationServic
             nodeInstEntity = nodeInstEntityOpt.get();
             nodeInstEntity.setUpdatedTime(now);
             nodeInstEntity.setStatus(TaskNodeInstInfoEntity.COMPLETED_STATUS);
+            nodeInstEntity.setErrorMessage("");
 
             taskNodeInstInfoRepository.save(nodeInstEntity);
         }
@@ -352,7 +354,11 @@ public class AsyncPluginInvocationService extends AbstractPluginInvocationServic
 
             EntityOperationRootCondition condition = new EntityOperationRootCondition(paramExpr, nodeEntityId);
 
-            this.entityOperationService.update(condition, retVal);
+            try {
+            	this.entityOperationService.update(condition, retVal);
+            }catch(Exception e) {
+            	log.warn("Exceptions to update entity.", e);
+            }
 
         }
     }
@@ -503,6 +509,7 @@ public class AsyncPluginInvocationService extends AbstractPluginInvocationServic
             nodeInstEntity = nodeInstEntityOpt.get();
             nodeInstEntity.setUpdatedTime(now);
             nodeInstEntity.setStatus(TaskNodeInstInfoEntity.FAULTED_STATUS);
+            nodeInstEntity.setErrorMessage(errorMsg);
 
             taskNodeInstInfoRepository.save(nodeInstEntity);
         }

@@ -36,8 +36,12 @@
           </Submenu>
         </Menu>
       </Col>
-      <Col span="18" offset="0" style="padding-left: 10px" v-if="hidePanal">
-        <Form :model="form">
+      <Col span="18" offset="0" style="padding-left: 10px">
+        <Spin size="large" fix style="margin-top: 200px;" v-show="isLoading">
+          <Icon type="ios-loading" size="44" class="spin-icon-load"></Icon>
+          <div>{{ $t('loading') }}</div>
+        </Spin>
+        <Form :model="form" v-show="hidePanal">
           <Row style="border-bottom: 1px solid #bbb7b7; margin-top: 20px">
             <Col span="12" offset="0">
               <FormItem :label-width="100" :label="$t('regist_name')">
@@ -46,7 +50,11 @@
             </Col>
             <Col span="12" offset="0">
               <FormItem :label-width="100" :label="$t('target_type')">
-                <FilterRules v-model="selectedEntityType" :allDataModelsWithAttrs="allEntityType"></FilterRules>
+                <FilterRules
+                  v-model="selectedEntityType"
+                  :disabled="currentPluginObj.status === 'ENABLED'"
+                  :allDataModelsWithAttrs="allEntityType"
+                ></FilterRules>
               </FormItem>
             </Col>
           </Row>
@@ -156,14 +164,15 @@
                           </Col>
                           <Col span="10" offset="0">
                             <FormItem :label-width="0">
-                              <PathExp
+                              <FilterRules
                                 v-if="param.mappingType === 'entity'"
-                                :rootPkg="pkgName"
-                                :rootEntity="rootEntity"
-                                :allDataModelsWithAttrs="allEntityType"
-                                :disabled="currentPluginObj.status === 'ENABLED'"
                                 v-model="param.mappingEntityExpression"
-                              ></PathExp>
+                                :disabled="currentPluginObj.status === 'ENABLED'"
+                                :allDataModelsWithAttrs="allEntityType"
+                                :rootEntity="selectedEntityType"
+                                :needNativeAttr="true"
+                                :needAttr="true"
+                              ></FilterRules>
                               <Select
                                 v-if="param.mappingType === 'system_variable'"
                                 v-model="param.mappingSystemVariableName"
@@ -241,14 +250,15 @@
                           </Col>
                           <Col span="10" offset="0">
                             <FormItem :label-width="0">
-                              <PathExp
+                              <FilterRules
                                 v-if="outPut.mappingType === 'entity'"
-                                :rootPkg="pkgName"
-                                :rootEntity="rootEntity"
-                                :allDataModelsWithAttrs="allEntityType"
-                                :disabled="currentPluginObj.status === 'ENABLED'"
                                 v-model="outPut.mappingEntityExpression"
-                              ></PathExp>
+                                :disabled="currentPluginObj.status === 'ENABLED'"
+                                :allDataModelsWithAttrs="allEntityType"
+                                :rootEntity="selectedEntityType"
+                                :needNativeAttr="true"
+                                :needAttr="true"
+                              ></FilterRules>
                               <span v-if="outPut.mappingType === 'context'">N/A</span>
                             </FormItem>
                           </Col>
@@ -294,7 +304,6 @@
   </div>
 </template>
 <script>
-import PathExp from '../../components/path-exp.vue'
 import FilterRules from '../../components/filter-rules.vue'
 import InterfaceFilterRule from '../../components/interface-filter-rule.vue'
 import {
@@ -312,6 +321,7 @@ import {
 export default {
   data () {
     return {
+      isLoading: false,
       activePanel: null,
       allDataModelsWithAttrs: {},
       currentPlugin: '',
@@ -341,7 +351,6 @@ export default {
     }
   },
   components: {
-    PathExp,
     FilterRules,
     InterfaceFilterRule
   },
@@ -393,8 +402,8 @@ export default {
         })
         return
       }
-      this.currentPluginObj.registerName = this.registerName
       let currentPluginForSave = JSON.parse(JSON.stringify(this.currentPluginObj))
+      currentPluginForSave.registerName = this.registerName
       currentPluginForSave.targetEntityWithFilterRule = this.selectedEntityType
       if (this.hasNewSource) {
         delete currentPluginForSave.id
@@ -433,14 +442,17 @@ export default {
       }
       const saveRes = await savePluginConfig(currentPluginForSave)
       if (saveRes.status === 'OK') {
-        const { status, message } = await registerPlugin(this.currentPluginObj.id)
+        if (this.hasNewSource) {
+          this.hasNewSource = false
+        }
+        const { status, message } = await registerPlugin(saveRes.data.id)
         if (status === 'OK') {
           this.$Notice.success({
             title: 'Success',
             desc: message
           })
           await this.getAllPluginByPkgId()
-          this.getInterfacesByPluginConfigId(this.currentPluginObj.id)
+          this.getInterfacesByPluginConfigId(saveRes.data.id)
         }
       }
     },
@@ -529,6 +541,7 @@ export default {
     },
     async getInterfacesByPluginConfigId (id) {
       this.hidePanal = false
+      this.isLoading = true
       this.currentPluginObj = {}
       let currentConfig = this.allPluginConfigs.find(s => s.id === id)
       const { data, status } = await getInterfacesByPluginConfigId(id)
@@ -544,6 +557,7 @@ export default {
       this.selectedEntityType = currentConfig.targetEntityWithFilterRule
       this.registerName = this.currentPluginObj.registerName
       this.hidePanal = true
+      this.isLoading = false
     },
     copyRegistSource (v) {
       this.registSourceChange(v)
@@ -585,6 +599,15 @@ export default {
   }
   .ivu-menu-vertical .ivu-menu-submenu-title-icon {
     right: 0;
+  }
+  .ivu-menu-vertical .ivu-menu-opened > * > .ivu-menu-submenu-title-icon {
+    color: #2d8cf0;
+  }
+  .ivu-menu-opened {
+    .ivu-menu-submenu-title {
+      background: rgb(224, 230, 231);
+      border-radius: 5px;
+    }
   }
 }
 </style>

@@ -40,6 +40,25 @@ public class StandardEntityOperationServiceTests extends BaseSpringBootTest {
         mockers = new StandardEntityOperationServiceTestsMockers(gatewayUrl);
     }
     
+    
+    @Test
+    public void wecmdbMultipleRefToLinksWithOpToOnlyExpressionFetchShouldSucceed() {
+        mockers.mockWecmdbMultipleRefToLinksWithOpToOnlyExpressionFetchShouldSucceed(server);
+
+        List<Object> result = standardEntityOperationService.queryAttributeValues(new EntityOperationRootCondition(
+                "wecmdb:subsys.subsys_design>wecmdb:subsys_design.system_design>wecmdb:system_design.key_name",
+                "0007_0000000001"));
+        Assert.assertNotNull(result);
+        Assert.assertEquals("ECIF", result.get(0));
+
+        result = standardEntityOperationService.queryAttributeValues(new EntityOperationRootCondition(
+                "wecmdb:zone_link.zone1>wecmdb:zone.zone_design>wecmdb:zone_design.fixed_date", "0018_0000000002"));
+        Assert.assertNotNull(result);
+        Assert.assertNull(result.get(0));
+
+        server.verify();
+    }
+    
     @Test
     public void givenSignleLinkNodeWithFilterExpressionWhenFetchThenShouldSucceed() {
         mockers.mockSingleLinkNodeWithFilterExpressionServer(server);
@@ -134,7 +153,7 @@ public class StandardEntityOperationServiceTests extends BaseSpringBootTest {
         mockers.mockOneLinkWithOpByOnlyExpressionServer(server);
 
         List<Object> result = standardEntityOperationService.queryAttributeValues(new EntityOperationRootCondition(
-                "wecmdb:subsys~(subsys)wecmdb:unit.fixed_date{attr1 eq '@@0001_1000222666@@abcDEF'}", "0007_0000000001"));
+                "wecmdb:subsys~(subsys)wecmdb:unit{attr1 eq '@@0001_1000222666@@abcDEF'}.fixed_date", "0007_0000000001"));
         Assert.assertNotNull(result);
         Assert.assertEquals(2, result.size());
         Assert.assertEquals("2019-07-24 16:30:35", result.get(0));
