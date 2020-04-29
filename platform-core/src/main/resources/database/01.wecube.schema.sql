@@ -339,11 +339,11 @@ CREATE TABLE `favorites_role` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `role_plugin_interface`;
-CREATE TABLE `role_plugin_interface` (
+DROP TABLE IF EXISTS `role_plugin_service_name`;
+CREATE TABLE `role_plugin_service_name` (
     `id`      VARCHAR(255) PRIMARY KEY,
     `role_name` VARCHAR(64) NOT NULL,
-    `plugin_interface_id` VARCHAR(255) NOT NULL
+    `plugin_service_name` VARCHAR(500) NOT NULL
 ) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
 
 SET FOREIGN_KEY_CHECKS = 1;

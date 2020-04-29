@@ -1,18 +1,18 @@
 package com.webank.wecube.platform.core.service.plugin;
 
+import com.webank.wecube.platform.core.commons.AuthenticationContextHolder;
 import com.webank.wecube.platform.core.commons.WecubeCoreException;
-import com.webank.wecube.platform.core.domain.RolePluginInterface;
+import com.webank.wecube.platform.core.domain.RolePluginServiceName;
 import com.webank.wecube.platform.core.domain.plugin.*;
 import com.webank.wecube.platform.core.dto.PluginConfigDto;
 import com.webank.wecube.platform.core.dto.PluginConfigInterfaceDto;
 import com.webank.wecube.platform.core.dto.PluginInterfaceRoleRequestDto;
-import com.webank.wecube.platform.core.dto.TargetEntityFilterRuleDto;
+import com.webank.wecube.platform.core.dto.queryAvailableInterfacesForProcessDefinitionDto;
 import com.webank.wecube.platform.core.jpa.PluginConfigInterfaceRepository;
 import com.webank.wecube.platform.core.jpa.PluginConfigRepository;
 import com.webank.wecube.platform.core.jpa.PluginPackageEntityRepository;
 import com.webank.wecube.platform.core.jpa.PluginPackageRepository;
 
-import net.bytebuddy.asm.Advice.Return;
 
 import com.webank.wecube.platform.core.jpa.*;
 import org.apache.commons.lang3.StringUtils;
@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -52,7 +51,7 @@ public class PluginConfigService {
     @Autowired
     private PluginPackageDataModelRepository dataModelRepository;
     @Autowired
-    private RolePluginInterfaceRepository rolePluginInterfaceRepository;
+    private RolePluginServiceNameRepository rolePluginInterfaceRepository;
 
     public List<PluginConfigInterface> getPluginConfigInterfaces(String pluginConfigId) {
         return pluginConfigRepository.findAllPluginConfigInterfacesByConfigIdAndFetchParameters(pluginConfigId);
@@ -260,70 +259,37 @@ public class PluginConfigService {
     }
 
     public List<PluginConfigInterfaceDto> queryAllEnabledPluginConfigInterfaceForEntity(String packageName,
-            String entityName, TargetEntityFilterRuleDto filterRuleDto) {
-        Optional<PluginPackageDataModel> dataModelOptional = dataModelRepository
-                .findLatestDataModelByPackageName(packageName);
-        if (!dataModelOptional.isPresent()) {
-            log.info("No data model found for package [{}]", packageName);
-            return Collections.EMPTY_LIST;
-        }
-        Set<PluginPackageEntity> pluginPackageEntities = dataModelOptional.get().getPluginPackageEntities();
-        if (null != pluginPackageEntities && pluginPackageEntities.size() > 0) {
-            if (!pluginPackageEntities.stream().filter(entity -> entity.getName().equals(entityName)).findAny()
-                    .isPresent()) {
-                log.info("No entity found with name [{}}] for package [{}}]", entityName, packageName);
-                return Collections.EMPTY_LIST;
-            }
+            String entityName, queryAvailableInterfacesForProcessDefinitionDto filterRuleDto) {
+        List<PluginConfigInterfaceDto> pluginConfigInterfaceDtos = newArrayList();
+
+        List<String> roleList = new ArrayList<String>(AuthenticationContextHolder.getCurrentUserRoles());
+        Optional<List<RolePluginServiceName>> rolePluginInterfaceOptional = rolePluginInterfaceRepository
+                .findAllByRoleNameIn(roleList);
+        if (!rolePluginInterfaceOptional.isPresent()) {
+            return pluginConfigInterfaceDtos;
         }
 
-        List<PluginConfigInterfaceDto> pluginConfigInterfaceDtos = newArrayList();
-        if (filterRuleDto == null) {
-            Optional<List<PluginConfigInterface>> allEnabledInterfacesOptional = pluginConfigInterfaceRepository
-                    .findPluginConfigInterfaceByPluginConfig_TargetPackageAndPluginConfig_TargetEntityAndPluginConfig_Status(
-                            packageName, entityName, ENABLED);
-            if (allEnabledInterfacesOptional.isPresent()) {
-                pluginConfigInterfaceDtos.addAll(allEnabledInterfacesOptional.get().stream()
-                        .map(pluginConfigInterface -> PluginConfigInterfaceDto.fromDomain(pluginConfigInterface))
-                        .collect(Collectors.toList()));
-            }
-        } else {
-            if (filterRuleDto.getTargetEntityFilterRule() == null
-                    || filterRuleDto.getTargetEntityFilterRule().isEmpty()) {
-                Optional<List<PluginConfigInterface>> filterRuleIsNullEnabledInterfacesOptional = pluginConfigInterfaceRepository
-                        .findPluginConfigInterfaceByPluginConfig_TargetPackageAndPluginConfig_TargetEntityAndPluginConfig_StatusAndPluginConfig_TargetEntityFilterRuleIsNull(
-                                packageName, entityName, ENABLED);
-                if (filterRuleIsNullEnabledInterfacesOptional.isPresent()) {
-                    pluginConfigInterfaceDtos.addAll(filterRuleIsNullEnabledInterfacesOptional.get().stream()
-                            .map(pluginConfigInterface -> PluginConfigInterfaceDto.fromDomain(pluginConfigInterface))
-                            .collect(Collectors.toList()));
-                }
-                Optional<List<PluginConfigInterface>> filterRuleIsEmptyEnabledInterfacesOptional = pluginConfigInterfaceRepository
-                        .findPluginConfigInterfaceByPluginConfig_TargetPackageAndPluginConfig_TargetEntityAndPluginConfig_TargetEntityFilterRuleAndPluginConfig_Status(
-                                packageName, entityName, "", ENABLED);
-                if (filterRuleIsEmptyEnabledInterfacesOptional.isPresent()) {
-                    pluginConfigInterfaceDtos.addAll(filterRuleIsEmptyEnabledInterfacesOptional.get().stream()
-                            .map(pluginConfigInterface -> PluginConfigInterfaceDto.fromDomain(pluginConfigInterface))
-                            .collect(Collectors.toList()));
-                }
-            } else {
-                Optional<List<PluginConfigInterface>> allEnabledInterfacesOptional = pluginConfigInterfaceRepository
-                        .findPluginConfigInterfaceByPluginConfig_TargetPackageAndPluginConfig_TargetEntityAndPluginConfig_TargetEntityFilterRuleAndPluginConfig_Status(
-                                packageName, entityName, filterRuleDto.getTargetEntityFilterRule(), ENABLED);
-                if (allEnabledInterfacesOptional.isPresent()) {
-                    pluginConfigInterfaceDtos.addAll(allEnabledInterfacesOptional.get().stream()
-                            .map(pluginConfigInterface -> PluginConfigInterfaceDto.fromDomain(pluginConfigInterface))
-                            .collect(Collectors.toList()));
-                }
-            }
+        List<String> pluginInterfaceIdList = rolePluginInterfaceOptional.get().stream()
+                .map(rolePluginInterface -> rolePluginInterface.getPluginServiceName()).collect(Collectors.toList());
+
+        Optional<List<PluginConfigInterface>> allEnabledInterfacesOptional = pluginConfigInterfaceRepository
+                .findAvailableByEntity(packageName, entityName);
+        if (!allEnabledInterfacesOptional.isPresent()) {
+            return pluginConfigInterfaceDtos;
         }
-        
-        Optional<List<PluginConfigInterface>> allEnabledWithEntityNameNullOptional = pluginConfigInterfaceRepository
-                .findAllEnabledWithEntityNameNull();
-        if (allEnabledWithEntityNameNullOptional.isPresent()) {
-            pluginConfigInterfaceDtos.addAll(allEnabledWithEntityNameNullOptional.get().stream()
+
+        List<PluginConfigInterface> pluginConfigInterfaceList = allEnabledInterfacesOptional.get();
+
+        if (filterRuleDto == null || filterRuleDto.getTargetEntityFilterRule() == null
+                || filterRuleDto.getTargetEntityFilterRule().isEmpty()) {
+            pluginConfigInterfaceDtos.addAll(pluginConfigInterfaceList.stream()
+                    .filter(pluginConfigInterface -> pluginInterfaceIdList.contains(pluginConfigInterface.getId())
+                            && (pluginConfigInterface.getFilterRule() == null
+                                    || pluginConfigInterface.getFilterRule().isEmpty()))
                     .map(pluginConfigInterface -> PluginConfigInterfaceDto.fromDomain(pluginConfigInterface))
                     .collect(Collectors.toList()));
         }
+
         return pluginConfigInterfaceDtos;
     }
 
@@ -364,32 +330,46 @@ public class PluginConfigService {
         }
     }
 
-    public List<RolePluginInterface> getPluginInterfacePermissionById(String pluginInterfaceId) {
-        Optional<List<RolePluginInterface>> rolePluginInterfaceOptional = rolePluginInterfaceRepository
-                .findAllByPluginInterfaceId(pluginInterfaceId);
+    public List<RolePluginServiceName> getPluginInterfacePermissionById(String pluginInterfaceId) {
+        Optional<List<RolePluginServiceName>> rolePluginInterfaceOptional = rolePluginInterfaceRepository
+                .findAllByPluginServiceName(pluginInterfaceId);
         if (rolePluginInterfaceOptional.isPresent()) {
             return rolePluginInterfaceOptional.get();
         }
-        return new ArrayList<RolePluginInterface>();
+        return new ArrayList<RolePluginServiceName>();
     }
 
-    public void grantPluginInterfacePermissionToRoles(String pluginInterfaceId,
+    public void grantPluginInterfacePermissionToRoles(String pluginServiceName,
             PluginInterfaceRoleRequestDto pluginInterfaceRoleRequestDto) {
+        if (pluginServiceName == null || pluginInterfaceRoleRequestDto == null
+                || pluginInterfaceRoleRequestDto.getRoleNameList() == null) {
+            return;
+        }
+        if (pluginInterfaceRoleRequestDto.getRoleNameList().size() == 0) {
+            return;
+        }
+
+        List<RolePluginServiceName> newRolePluginServiceNameList = new ArrayList<RolePluginServiceName>();
         for (String roleName : pluginInterfaceRoleRequestDto.getRoleNameList()) {
-            if (!rolePluginInterfaceRepository.existsRolePluginInterfaceByRoleNameAndPluginInterfaceId(roleName,
-                    pluginInterfaceId)) {
-                rolePluginInterfaceRepository.save(new RolePluginInterface(roleName, pluginInterfaceId));
+            if (!rolePluginInterfaceRepository.existsRolePluginInterfaceByRoleNameAndPluginServiceName(roleName,
+                    pluginServiceName)) {
+                newRolePluginServiceNameList.add(new RolePluginServiceName(roleName, pluginServiceName));
             }
         }
+        rolePluginInterfaceRepository.saveAll(newRolePluginServiceNameList);
     }
 
-    public void removePluginInterfacePermissionToRoles(String pluginInterfaceId,
+    public void removePluginInterfacePermissionToRoles(String pluginServiceName,
             PluginInterfaceRoleRequestDto pluginInterfaceRoleRequestDto) {
-        for (String roleName : pluginInterfaceRoleRequestDto.getRoleNameList()) {
-            rolePluginInterfaceRepository.findByRoleNameAndPluginInterfaceId(roleName, pluginInterfaceId)
-                    .forEach(rolePluginInterface -> {
-                        rolePluginInterfaceRepository.delete(rolePluginInterface);
-                    });
+        if (pluginServiceName == null || pluginInterfaceRoleRequestDto == null
+                || pluginInterfaceRoleRequestDto.getRoleNameList() == null) {
+            return;
         }
+        if (pluginInterfaceRoleRequestDto.getRoleNameList().size() == 0) {
+            return;
+        }
+
+        rolePluginInterfaceRepository.deleteByPluginServiceNameAndRoleNameIn(pluginServiceName,
+                pluginInterfaceRoleRequestDto.getRoleNameList());
     }
 }
