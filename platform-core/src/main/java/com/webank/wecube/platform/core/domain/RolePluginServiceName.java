@@ -7,8 +7,8 @@ import javax.persistence.*;
 import java.util.Objects;
 
 @Entity
-@Table(name = "role_plugin_interface")
-public class RolePluginInterface {
+@Table(name = "role_plugin_service_name")
+public class RolePluginServiceName {
 
     @Id
     @JsonIgnore
@@ -17,23 +17,23 @@ public class RolePluginInterface {
     @Column(name = "role_name")
     private String roleName;
 
-    @Column(name = "plugin_interface_id")
-    private String pluginInterfaceId;
+    @Column(name = "plugin_service_name")
+    private String pluginServiceName;
 
-    public RolePluginInterface(String roleName, String pluginInterfaceId) {
+    public RolePluginServiceName(String roleName, String pluginServiceName) {
         this.roleName = roleName;
-        this.pluginInterfaceId = pluginInterfaceId;
+        this.pluginServiceName = pluginServiceName;
     }
 
-    public RolePluginInterface() {
+    public RolePluginServiceName() {
     }
 
     @PrePersist
     public void initGuid() {
         if (this.id == null || "".equals(this.id)) {
-            this.id = Objects.requireNonNull(this.roleName, "The [roleName] cannot be NULL while persisting [role_plugin_interface]")
+            this.id = Objects.requireNonNull(this.roleName, "The [roleName] cannot be NULL while persisting [role_plugin_service_name]")
                     + Constants.KEY_COLUMN_DELIMITER
-                    + Objects.requireNonNull(this.pluginInterfaceId, "The [pluginInterfaceId] cannot be NULL while persisting [role_plugin_interface]");
+                    + Objects.requireNonNull(this.pluginServiceName, "The [pluginServiceName] cannot be NULL while persisting [role_plugin_service_name]");
         }
     }
 
@@ -45,12 +45,12 @@ public class RolePluginInterface {
         this.id = id;
     }
 
-    public String getPluginInterfaceId() {
-        return pluginInterfaceId;
+    public String getPluginServiceName() {
+        return pluginServiceName;
     }
 
-    public void setPluginInterfaceId(String pluginInterfaceId) {
-        this.pluginInterfaceId = pluginInterfaceId;
+    public void setPluginServiceName(String pluginServiceName) {
+        this.pluginServiceName = pluginServiceName;
     }
 
     public String getRoleName() {
