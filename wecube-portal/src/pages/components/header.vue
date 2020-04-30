@@ -1,6 +1,6 @@
 <template>
   <Header>
-    <span class="logo">WeCube(Demo)</span>
+    <span class="logo">WeCube ( DEMO VERSION )</span>
     <div class="menus">
       <Menu mode="horizontal" theme="dark">
         <div v-for="menu in menus" :key="menu.code">

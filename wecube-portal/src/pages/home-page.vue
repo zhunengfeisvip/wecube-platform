@@ -1,6 +1,6 @@
 <template>
   <div>
-    <p style="margin-top: 20px; height: 200px; font-size: 24px !important;">
+    <p style="margin-top: 50px; height: 200px; font-size: 24px !important; text-align: center">
       {{ $t('wecube_desc') }}
     </p>
     <div class="graph_container">
