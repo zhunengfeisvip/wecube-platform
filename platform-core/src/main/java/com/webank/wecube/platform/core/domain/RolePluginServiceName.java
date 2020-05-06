@@ -1,16 +1,19 @@
 package com.webank.wecube.platform.core.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.webank.wecube.platform.core.utils.Constants;
-
 import javax.persistence.*;
-import java.util.Objects;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "role_plugin_service_name")
+@GenericGenerator(name = "jpa-uuid", strategy = "uuid")
 public class RolePluginServiceName {
 
     @Id
+    @GeneratedValue(generator = "jpa-uuid")
+    @Column(name = "id", length = 32)
     @JsonIgnore
     private String id;
 
@@ -20,21 +23,16 @@ public class RolePluginServiceName {
     @Column(name = "plugin_service_name")
     private String pluginServiceName;
 
-    public RolePluginServiceName(String roleName, String pluginServiceName) {
+    @Column(name = "permission")
+    private String permission;
+
+    public RolePluginServiceName(String roleName, String pluginServiceName, String permission) {
         this.roleName = roleName;
         this.pluginServiceName = pluginServiceName;
+        this.permission = permission;
     }
 
     public RolePluginServiceName() {
-    }
-
-    @PrePersist
-    public void initGuid() {
-        if (this.id == null || "".equals(this.id)) {
-            this.id = Objects.requireNonNull(this.roleName, "The [roleName] cannot be NULL while persisting [role_plugin_service_name]")
-                    + Constants.KEY_COLUMN_DELIMITER
-                    + Objects.requireNonNull(this.pluginServiceName, "The [pluginServiceName] cannot be NULL while persisting [role_plugin_service_name]");
-        }
     }
 
     public String getId() {
@@ -59,5 +57,13 @@ public class RolePluginServiceName {
 
     public void setRoleName(String roleName) {
         this.roleName = roleName;
+    }
+
+    public String getPermission() {
+        return permission;
+    }
+
+    public void setPermission(String permission) {
+        this.permission = permission;
     }
 }
