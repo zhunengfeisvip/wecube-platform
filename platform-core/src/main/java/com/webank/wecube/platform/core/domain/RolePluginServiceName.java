@@ -66,4 +66,5 @@ public class RolePluginServiceName {
     public void setPermission(String permission) {
         this.permission = permission;
     }
+
 }
