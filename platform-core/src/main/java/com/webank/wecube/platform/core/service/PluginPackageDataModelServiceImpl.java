@@ -1,6 +1,7 @@
 package com.webank.wecube.platform.core.service;
 
 import com.google.common.base.Splitter;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -36,6 +37,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.google.common.collect.Sets.newLinkedHashSet;
@@ -391,19 +393,25 @@ public class PluginPackageDataModelServiceImpl implements PluginPackageDataModel
 
     @Override
     public PluginPackageDataModelDto pullDynamicDataModel(String packageName) {
+        Stopwatch sw = Stopwatch.createStarted();
         Optional<PluginPackage> latestPluginPackageByName = pluginPackageRepository.findLatestVersionByName(packageName);
         if (!latestPluginPackageByName.isPresent()) {
             String errorMessage = String.format("Plugin package with name [%s] is not found", packageName);
             logger.error(errorMessage);
             throw new WecubeCoreException(errorMessage);
         }
+        sw.stop();
+        logger.info("[pullDynamicDataModel] findLatestVersionBy elapse {} ms",sw.elapsed(TimeUnit.MICROSECONDS));
 
+        sw.start();
         Optional<PluginPackageDataModel> latestDataModelByPackageName = dataModelRepository.findLatestDataModelByPackageName(packageName);
         if (!latestDataModelByPackageName.isPresent()) {
             String errorMessage = String.format("Data model not found for package name=[%s]", packageName);
             logger.error(errorMessage);
             throw new WecubeCoreException(errorMessage);
         }
+        sw.stop();
+        logger.info("[pullDynamicDataModel] findLatestDataModelByPackageName elapse {} ms",sw.elapsed(TimeUnit.MICROSECONDS));
 
         PluginPackageDataModel dataModel = latestDataModelByPackageName.get();
         if (!dataModel.isDynamic()) {
@@ -411,6 +419,7 @@ public class PluginPackageDataModelServiceImpl implements PluginPackageDataModel
             logger.error(message);
             throw new WecubeCoreException(message);
         }
+
 
         PluginPackageDataModelDto dataModelDto = new PluginPackageDataModelDto();
         dataModelDto.setPackageName(packageName);
@@ -422,9 +431,16 @@ public class PluginPackageDataModelServiceImpl implements PluginPackageDataModel
         dataModelDto.setUpdatePath(dataModel.getUpdatePath());
         dataModelDto.setDynamic(true);
 
+        sw.start();
         Set<PluginPackageEntityDto> dynamicPluginPackageEntities = pullDynamicDataModelFromPlugin(dataModel);
+        sw.stop();
+        logger.info("[pullDynamicDataModel] pullDynamicDataModelFromPlugin elapse {} ms",sw.elapsed(TimeUnit.MICROSECONDS));
 
+
+        sw.start();
         updateEntityReferences(packageName, newDataModelVersion, dynamicPluginPackageEntities);
+        sw.stop();
+        logger.info("[pullDynamicDataModel] updateEntityReferences elapse {} ms",sw.elapsed(TimeUnit.MICROSECONDS));
 
         dataModelDto.setPluginPackageEntities(dynamicPluginPackageEntities);
 
