@@ -21,31 +21,19 @@
                   "
                 >
                   <span>
-                    <span style="color:#2b85e4">
-                      {{ item.procInstName + ' ' }}
-                    </span>
-                    <span style="color:#515a6e">
-                      {{ item.entityDisplayName + ' ' }}
-                    </span>
-                    <span style="color:#ccc;float:right">
-                      {{ (item.createdTime || 'createdTime') + ' ' }}
-                    </span>
-                    <span style="float:right;color:#515a6e;margin-right:20px">
-                      {{ item.operator || 'operator' }}
-                    </span>
+                    <span style="color:#2b85e4">{{ item.procInstName + ' ' }}</span>
+                    <span style="color:#515a6e">{{ item.entityDisplayName + ' ' }}</span>
+                    <span style="color:#ccc;float:right">{{ (item.createdTime || 'createdTime') + ' ' }}</span>
+                    <span style="float:right;color:#515a6e;margin-right:20px">{{ item.operator || 'operator' }}</span>
                   </span>
                 </Option>
               </Select>
-              <Button type="info" @click="queryHandler">
-                {{ $t('query_orch') }}
-              </Button>
+              <Button type="info" @click="queryHandler">{{ $t('query_orch') }}</Button>
             </FormItem>
           </Form>
         </Col>
         <Col span="4" style="text-align: right;margin-bottom:8px;padding-right:40px;float:right;">
-          <Button type="info" v-if="!isEnqueryPage" @click="queryHistory">
-            {{ $t('enquery_new_workflow_job') }}
-          </Button>
+          <Button type="info" v-if="!isEnqueryPage" @click="queryHistory">{{ $t('enquery_new_workflow_job') }}</Button>
           <Button type="success" v-if="isEnqueryPage" @click="createHandler">
             {{ $t('create_new_workflow_job') }}
           </Button>
@@ -117,6 +105,9 @@
       <div class="workflowActionModal-container" style="text-align: center;margin-top: 20px;">
         <Button type="info" @click="workFlowActionHandler('retry')">{{ $t('retry') }}</Button>
         <Button type="info" @click="workFlowActionHandler('skip')" style="margin-left: 20px">{{ $t('skip') }}</Button>
+        <Button type="info" @click="workFlowActionHandler('showlog')" style="margin-left: 20px">{{
+          $t('show_log')
+        }}</Button>
       </div>
     </Modal>
     <Modal
@@ -211,6 +202,7 @@ import { addEvent, removeEvent } from '../util/event.js'
 export default {
   data () {
     return {
+      currentModelNodeRefs: [],
       showNodeDetail: false,
       isTargetNodeDetail: false,
       nodeDetailFullscreen: false,
@@ -447,6 +439,7 @@ export default {
 
     orchestrationSelectHandler () {
       this.currentFlowNodeId = ''
+      this.currentModelNodeRefs = []
       this.getFlowOutlineData(this.selectedFlow)
       if (this.selectedFlow && this.isEnqueryPage === false) {
         this.showExcution = true
@@ -484,6 +477,8 @@ export default {
           this.initFlowGraph(true)
           removeEvent('.retry', 'click', this.retryHandler)
           addEvent('.retry', 'click', this.retryHandler)
+          removeEvent('.normal', 'click', this.normalHandler)
+          addEvent('.normal', 'click', this.normalHandler)
           d3.selectAll('.retry').attr('cursor', 'pointer')
 
           this.showExcution = false
@@ -519,6 +514,7 @@ export default {
       })
     },
     onTargetSelectHandler () {
+      this.currentModelNodeRefs = []
       this.getModelData()
     },
     async getModelData () {
@@ -611,6 +607,10 @@ export default {
       // .on('end', this.setFontSizeForText)
       removeEvent('.model text', 'mouseenter', this.modelGraphMouseenterHandler)
       removeEvent('.model text', 'mouseleave', this.modelGraphMouseleaveHandler)
+      removeEvent('.model text', 'click', this.modelGraphClickHandler)
+      removeEvent('#graph svg', 'click', this.resetcurrentModelNodeRefs)
+      addEvent('.model text', 'click', this.modelGraphClickHandler)
+      addEvent('#graph svg', 'click', this.resetcurrentModelNodeRefs)
       addEvent('.model text', 'mouseenter', this.modelGraphMouseenterHandler)
       addEvent('.model text', 'mouseleave', this.modelGraphMouseleaveHandler)
     },
@@ -621,6 +621,23 @@ export default {
         const fontsize = Math.min((nondes[i].children[1].rx.baseVal.value / len) * 3, 16)
         for (let j = 2; j < nondes[i].children.length; j++) {
           nondes[i].children[j].setAttribute('font-size', fontsize)
+        }
+      }
+    },
+    resetcurrentModelNodeRefs () {
+      if (!this.isEnqueryPage) {
+        this.currentModelNodeRefs = []
+        this.renderFlowGraph()
+      }
+    },
+    modelGraphClickHandler (e) {
+      e.preventDefault()
+      e.stopPropagation()
+      if (!this.isEnqueryPage) {
+        const refEle = e.target.parentNode.children[3]
+        if (refEle) {
+          this.currentModelNodeRefs = refEle.innerHTML.trim().split('/')
+          this.renderFlowGraph()
         }
       }
     },
@@ -642,7 +659,7 @@ export default {
         this.showNodeDetail = true
         this.nodeDetailFullscreen = false
         this.tableMaxHeight = 250
-      }, 1000)
+      }, 1300)
     },
     modelDetailEnterHandler (e) {
       let modelDetail = document.getElementById('model_graph_detail')
@@ -672,14 +689,22 @@ export default {
           .filter(i => i.status !== 'predeploy')
           .map((_, index) => {
             if (_.nodeType === 'startEvent' || _.nodeType === 'endEvent') {
-              return `${_.nodeId} [label="${_.nodeName || _.nodeType}", fontsize="10", class="flow",style="${
+              const defaultLabel = _.nodeType === 'startEvent' ? 'start' : 'end'
+              return `${_.nodeId} [label="${_.nodeName || defaultLabel}", fontsize="10", class="flow",style="${
                 excution ? 'filled' : 'none'
               }" color="${excution ? statusColor[_.status] : '#7F8A96'}" shape="circle", id="${_.nodeId}"]`
             } else {
-              const className = _.status === 'Faulted' || _.status === 'Timeouted' ? 'retry' : ''
-              return `${_.nodeId} [fixedsize=false label="${(_.orderedNo ? _.orderedNo + '、' : '') +
-                _.nodeName}" class="flow ${className}" style="${excution ? 'filled' : 'none'}" color="${
-                excution ? statusColor[_.status] : _.nodeId === this.currentFlowNodeId ? '#5DB400' : '#7F8A96'
+              const className = _.status === 'Faulted' || _.status === 'Timeouted' ? 'retry' : 'normal'
+              const isModelClick = this.currentModelNodeRefs.indexOf(_.orderedNo) > -1
+              return `${_.nodeId} [fixedsize=false label="${(_.orderedNo ? _.orderedNo + ' ' : '') +
+                _.nodeName}" class="flow ${className}" style="${excution || isModelClick ? 'filled' : 'none'}" color="${
+                excution
+                  ? statusColor[_.status]
+                  : isModelClick
+                    ? '#ff9900'
+                    : _.nodeId === this.currentFlowNodeId
+                      ? '#5DB400'
+                      : '#7F8A96'
               }"  shape="box" id="${_.nodeId}" ]`
             }
           })
@@ -785,6 +810,8 @@ export default {
         this.initFlowGraph(true)
         removeEvent('.retry', 'click', this.retryHandler)
         addEvent('.retry', 'click', this.retryHandler)
+        removeEvent('.normal', 'click', this.normalHandler)
+        addEvent('.normal', 'click', this.normalHandler)
         d3.selectAll('.retry').attr('cursor', 'pointer')
         if (data.status === 'Completed') {
           this.stop()
@@ -800,24 +827,31 @@ export default {
       this.targetModalVisible = false
       this.showNodeDetail = false
     },
+    normalHandler (e) {
+      this.flowGraphMouseenterHandler(e.target.parentNode.getAttribute('id'))
+    },
     async workFlowActionHandler (type) {
       const found = this.flowData.flowNodes.find(_ => _.nodeId === this.currentFailedNodeID)
       if (!found) {
         return
       }
-      const payload = {
-        act: type,
-        nodeInstId: found.id,
-        procInstId: found.procInstId
-      }
-      const { status } = await retryProcessInstance(payload)
-      if (status === 'OK') {
-        this.$Notice.success({
-          title: 'Success',
-          desc: (type === 'retry' ? 'Retry' : 'Skip') + ' action is proceed successfully'
-        })
-        this.workflowActionModalVisible = false
-        this.processInstance()
+      if (type === 'showlog') {
+        this.flowGraphMouseenterHandler(this.currentFailedNodeID)
+      } else {
+        const payload = {
+          act: type,
+          nodeInstId: found.id,
+          procInstId: found.procInstId
+        }
+        const { status } = await retryProcessInstance(payload)
+        if (status === 'OK') {
+          this.$Notice.success({
+            title: 'Success',
+            desc: (type === 'retry' ? 'Retry' : 'Skip') + ' action is proceed successfully'
+          })
+          this.workflowActionModalVisible = false
+          this.processInstance()
+        }
       }
     },
     bindFlowEvent () {
@@ -831,9 +865,9 @@ export default {
         addEvent('.flow', 'click', this.flowNodesClickHandler)
       } else {
         removeEvent('.flow', 'click', this.flowNodesClickHandler)
-        removeEvent('.flow text', 'mouseenter', this.flowGraphMouseenterHandler)
+        // removeEvent('.flow text', 'mouseenter', this.flowGraphMouseenterHandler)
         removeEvent('.flow text', 'mouseleave', this.flowGraphLeaveHandler)
-        addEvent('.flow text', 'mouseenter', this.flowGraphMouseenterHandler)
+        // addEvent('.flow text', 'mouseenter', this.flowGraphMouseenterHandler)
         addEvent('.flow text', 'mouseleave', this.flowGraphLeaveHandler)
       }
     },
@@ -841,13 +875,15 @@ export default {
       clearTimeout(this.flowDetailTimer)
       this.flowDetailLeaveHandler()
     },
-    flowGraphMouseenterHandler (e) {
+    flowGraphMouseenterHandler (id) {
+      // Task_0f9a25l
       clearTimeout(this.flowDetailTimer)
       this.flowDetailTimer = setTimeout(async () => {
-        const found = this.flowData.flowNodes.find(_ => _.nodeId === e.target.parentNode.id)
+        const found = this.flowData.flowNodes.find(_ => _.nodeId === id)
         this.nodeTitle = (found.orderedNo ? found.orderedNo + '、' : '') + found.nodeName
         const { status, data } = await getNodeContext(found.procInstId, found.id)
         if (status === 'OK') {
+          this.workflowActionModalVisible = false
           this.nodeDetailResponseHeader = JSON.parse(JSON.stringify(data))
           delete this.nodeDetailResponseHeader.requestObjects
           this.nodeDetailResponseHeader = JSON.stringify(this.replaceParams(this.nodeDetailResponseHeader))
@@ -896,6 +932,7 @@ export default {
       this.renderFlowGraph()
     },
     async highlightModel (nodeId, nodeDefId) {
+      console.log(this.processSessionId)
       if (nodeDefId && this.processSessionId) {
         let { status, data } = await getDataByNodeDefIdAndProcessSessionId(nodeDefId, this.processSessionId)
         if (status === 'OK') {
@@ -975,6 +1012,9 @@ export default {
 <style lang="scss" scoped>
 body {
   color: #e5f173; //#15a043;
+}
+.header-icon {
+  margin: 3px 40px 0 0 !important;
 }
 #graphcontain {
   border: 1px solid #d3cece;

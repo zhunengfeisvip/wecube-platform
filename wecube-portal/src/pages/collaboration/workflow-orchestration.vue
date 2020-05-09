@@ -273,10 +273,7 @@ export default {
     return {
       splitPanal: 1,
       show: false,
-      taskCategoryList: [
-        { value: 'SSTN', label: this.$t('sstn') },
-        { value: 'SUTN', label: this.$t('sutn') }
-      ],
+      taskCategoryList: [{ value: 'SSTN', label: this.$t('sstn') }, { value: 'SUTN', label: this.$t('sutn') }],
       isSaving: false,
       headers: {},
       isShowUploadList: false,
@@ -363,10 +360,7 @@ export default {
           label: '3 ' + this.$t('days')
         }
       ],
-      paramsTypes: [
-        { value: 'INPUT', label: this.$t('input') },
-        { value: 'OUTPUT', label: this.$t('output') }
-      ],
+      paramsTypes: [{ value: 'INPUT', label: this.$t('input') }, { value: 'OUTPUT', label: this.$t('output') }],
       currentflowsNodes: [],
       currentFlow: null
     }
@@ -720,6 +714,7 @@ export default {
               })
               _this.getAllFlows(true)
               _this.selectedFlow = data.data.procDefId
+              _this.getFlowXml(data.data.procDefId)
               _this.temporaryFlow = data.data.procDefId
             }
           })
